@@ -53,6 +53,7 @@
 #include <system/BSignal.h>
 #include <system/BAddr.h>
 #include <system/BNetwork.h>
+#include <system/BConnection.h>
 #include <flow/SinglePacketBuffer.h>
 #include <socksclient/BSocksClient.h>
 #include <tuntap/BTap.h>
@@ -117,6 +118,7 @@ struct {
     int udpgw_connection_buffer_size;
     int udpgw_transparent_dns;
     int socks5_udp;
+    int fwmark;
 } options;
 
 // TCP client
@@ -317,7 +319,13 @@ int main (int argc, char **argv)
         BLog(BLOG_ERROR, "BNetwork_GlobalInit failed");
         goto fail1;
     }
-    
+
+    // set fwmark for outgoing sockets
+    if (options.fwmark > 0) {
+        bconnection_fwmark = options.fwmark;
+        BLog(BLOG_INFO, "setting fwmark %d on outgoing sockets", options.fwmark);
+    }
+
     // process arguments
     if (!process_arguments()) {
         BLog(BLOG_ERROR, "Failed to process arguments");
@@ -527,6 +535,7 @@ void print_help (const char *name)
         "        [--udpgw-connection-buffer-size <number>]\n"
         "        [--udpgw-transparent-dns]\n"
         "        [--socks5-udp]\n"
+        "        [--fwmark <mark>]\n"
         "Address format is a.b.c.d:port (IPv4) or [addr]:port (IPv6).\n",
         name
     );
@@ -568,6 +577,7 @@ int parse_arguments (int argc, char *argv[])
     options.udpgw_connection_buffer_size = DEFAULT_UDPGW_CONNECTION_BUFFER_SIZE;
     options.udpgw_transparent_dns = 0;
     options.socks5_udp = 0;
+    options.fwmark = 0;
     
     int i;
     for (i = 1; i < argc; i++) {
@@ -747,6 +757,17 @@ int parse_arguments (int argc, char *argv[])
         }
         else if (!strcmp(arg, "--socks5-udp")) {
             options.socks5_udp = 1;
+        }
+        else if (!strcmp(arg, "--fwmark")) {
+            if (1 >= argc - i) {
+                fprintf(stderr, "%s: requires an argument\n", arg);
+                return 0;
+            }
+            if ((options.fwmark = atoi(argv[i + 1])) < 0) {
+                fprintf(stderr, "%s: wrong argument\n", arg);
+                return 0;
+            }
+            i++;
         }
         else {
             fprintf(stderr, "unknown option: %s\n", arg);

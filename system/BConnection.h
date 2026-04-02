@@ -153,6 +153,12 @@ void BListener_Free (BListener *o);
 
 
 
+/**
+ * Global fwmark for outgoing sockets (set by tun2socks --fwmark).
+ * When non-zero, SO_MARK is applied to all outgoing connector sockets.
+ */
+extern int bconnection_fwmark;
+
 struct BConnector_s;
 
 /**

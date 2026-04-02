@@ -43,6 +43,9 @@
 
 #include <generated/blog_channel_BConnection.h>
 
+// Global fwmark for outgoing sockets (set by tun2socks --fwmark)
+int bconnection_fwmark = 0;
+
 #define MAX_UNIX_SOCKET_PATH 200
 
 #define SEND_STATE_NOT_INITED 0
@@ -640,12 +643,20 @@ int BConnector_InitFrom (BConnector *o, struct BLisCon_from from, BReactor *reac
         }
     }
     
+    // set fwmark if configured (for policy routing bypass)
+    if (bconnection_fwmark > 0) {
+        int mark = bconnection_fwmark;
+        if (setsockopt(o->fd, SOL_SOCKET, SO_MARK, &mark, sizeof(mark)) < 0) {
+            BLog(BLOG_WARNING, "setsockopt(SO_MARK) failed");
+        }
+    }
+
     // set fd non-blocking
     if (!badvpn_set_nonblocking(o->fd)) {
         BLog(BLOG_ERROR, "badvpn_set_nonblocking failed");
         goto fail2;
     }
-    
+
     // connect fd
     int connect_res;
     if (from.type == BLISCON_FROM_UNIX) {
